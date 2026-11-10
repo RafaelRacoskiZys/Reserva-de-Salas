@@ -10,9 +10,7 @@ const db = require("./database");
 
 const app = express();
 
-// Cabeçalhos de segurança. O HSTS e o "upgrade-insecure-requests" ficam
-// desligados porque o projeto roda em http://localhost (sem HTTPS); o Safari,
-// por exemplo, quebraria a página com esse upgrade automático.
+
 app.use(
   helmet({
     hsts: false,
@@ -33,7 +31,7 @@ if (!JWT_SECRET) {
   throw new Error("JWT_SECRET não foi encontrada no arquivo .env");
 }
 
-// Limite de tentativas de login: só as tentativas ERRADAS contam.
+
 const limitarLogin = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: Number(process.env.LOGIN_LIMITE) || 10,
@@ -69,7 +67,7 @@ function dataDeHoje() {
   return `${agora.getFullYear()}-${dois(agora.getMonth() + 1)}-${dois(agora.getDate())}`;
 }
 
-// Datas no formato AAAA-MM-DD podem ser comparadas como texto.
+
 function dataEhPassada(data) {
   return data < dataDeHoje();
 }
@@ -176,8 +174,7 @@ function buscarTroca(trocaId) {
   `).get(trocaId);
 }
 
-// Quando uma reserva é cancelada ou muda de sala, data ou turno, os pedidos de
-// troca que ainda estavam pendentes para ela deixam de fazer sentido.
+
 function encerrarTrocasPendentes(reservaId) {
   db.prepare(`
     UPDATE solicitacoes_troca
@@ -210,13 +207,10 @@ function existeConflito(salaId, professorId, data, turno, plano) {
   return Boolean(conflitoNoBanco) || conflitoNoPlano;
 }
 
-// Limite de segurança: o backtracking é exponencial no pior caso, então a busca
-// é interrompida se passar desse número de verificações.
+
 const LIMITE_DE_VERIFICACOES = 20000;
 
-// Backtracking clássico: escolhe uma sala para o pedido atual, avança para o
-// próximo pedido e, se não houver solução, desfaz a escolha (pop) e tenta outra.
-// "estatisticas" só conta quantas tentativas e quantos retrocessos aconteceram.
+
 function montarPlanoComBacktracking(
   pedidos,
   data,
@@ -288,9 +282,7 @@ function montarPlanoComBacktracking(
   return false;
 }
 
-// Heurística OPCIONAL: atender primeiro os pedidos que têm menos salas
-// possíveis. Fica desligada por padrão para o backtracking clássico aparecer
-// em ação; ligue com "heuristica": true para comparar.
+
 function ordenarPedidos(pedidos, usarHeuristica) {
   if (!usarHeuristica) {
     return pedidos;
@@ -321,8 +313,7 @@ function gerarGrade({ data, turno, pedidos, usarHeuristica }) {
   return encontrouSolucao ? { plano, estatisticas } : null;
 }
 
-// Salas em que o professor pode dar aula, em ordem de preferência (tabela
-// professor_salas). Em aula teórica, as salas comuns passam na frente.
+
 function salasDoProfessor(professorId, motivo) {
   const salas = db.prepare(`
     SELECT s.id, s.tipo
@@ -342,11 +333,6 @@ function salasDoProfessor(professorId, motivo) {
   return salas.map((sala) => sala.id);
 }
 
-// Valida e normaliza o corpo das rotas de grade (sugerir e confirmar).
-// Dois jeitos de pedir:
-//  - automático: { data, turno, motivo, professores: [ids] }
-//    (as salas de cada professor vêm do banco);
-//  - manual: { data, turno, pedidos: [{ professorId, salasPermitidas, motivo }] }.
 function lerPedidosDaGrade(corpo) {
   const { data, turno } = corpo;
 
@@ -409,9 +395,6 @@ function lerPedidosDaGrade(corpo) {
   };
 }
 
-// Poda inicial: antes de rodar o backtracking, procura impossibilidades
-// óbvias (professor que já tem reserva ou professor sem nenhuma sala livre).
-// Devolve a mensagem do problema, ou null se não achou nada.
 function encontrarBloqueioDaGrade({ data, turno, pedidos }) {
   const nomeDoProfessor = (id) => buscarProfessor(id)?.nome ?? `Professor ${id}`;
 
@@ -448,7 +431,7 @@ function encontrarBloqueioDaGrade({ data, turno, pedidos }) {
   return null;
 }
 
-// Roda a poda inicial e depois o backtracking. Devolve { erro } ou { plano, estatisticas }.
+
 function montarGradeCompleta(dados) {
   const bloqueio = encontrarBloqueioDaGrade(dados);
 
@@ -1030,8 +1013,7 @@ app.post(
   }
 );
 
-// Confirma a grade: o servidor monta o plano de novo (não confia no que o
-// navegador mostrou) e cria todas as reservas numa única transação.
+
 app.post(
   "/sugestoes-grade/confirmar",
   autenticarToken,
@@ -1348,7 +1330,7 @@ app.patch("/trocas/:id/responder", autenticarToken, (req, res) => {
     });
   }
 
-  // Antes de trocar, confere se as reservas ainda são as mesmas do pedido.
+
   const aindaPossivel =
     reservaSolicitante.status === "confirmada" &&
     reservaDestino.status === "confirmada" &&
@@ -1396,8 +1378,7 @@ app.patch("/trocas/:id/responder", autenticarToken, (req, res) => {
       WHERE id = ?
     `).run(trocaId);
 
-    // As salas mudaram, então outros pedidos pendentes dessas reservas
-    // deixam de valer.
+
     encerrarTrocasPendentes(reservaSolicitante.id);
     encerrarTrocasPendentes(reservaDestino.id);
   });
@@ -1446,8 +1427,6 @@ app.get("/reservas-resumo", autenticarToken, (req, res) => {
   res.json(reservas);
 });
 
-// Só inicia o servidor quando o arquivo é executado diretamente
-// (node server.js). Nos testes, o arquivo é apenas importado.
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Servidor iniciado em http://localhost:${PORT}`);

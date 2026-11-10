@@ -134,8 +134,6 @@ const cadastrarDadosIniciais = db.transaction(() => {
 
 cadastrarDadosIniciais();
 
-// Salas em que cada professor pode dar aula, em ordem de preferência.
-// O backtracking usa essa lista para montar a grade automaticamente.
 db.exec(`
   CREATE TABLE IF NOT EXISTS professor_salas (
     professor_id INTEGER NOT NULL,
@@ -155,8 +153,6 @@ const salasComuns = [
   "Sala Normal 5"
 ];
 
-// Salas do curso de cada professor. Depois delas, todos podem usar as salas
-// comuns (por exemplo, para aula teórica). Pode ser ajustado à vontade.
 const salasPorProfessor = {
   "Sami Berti": ["Logística"],
   "Aletodescatt": ["Pneumática", "Elétrica Industrial", "Automação"],
