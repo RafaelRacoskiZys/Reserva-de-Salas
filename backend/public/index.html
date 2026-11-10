@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SENAI Reserva de Salas</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <section id="tela-login" class="card login-card">
+        <div class="marca">
+          <strong>SENAI</strong>
+          <span>Reserva de Salas</span>
+        </div>
+
+        <div>
+          <h1>Bem-vindo</h1>
+          <p>Entre com seu CPF e senha.</p>
+        </div>
+
+        <form id="form-login">
+          <label for="cpf">CPF</label>
+          <input id="cpf" type="text" inputmode="numeric" placeholder="Digite seu CPF" required />
+
+          <label for="senha">Senha</label>
+          <input id="senha" type="password" placeholder="Digite sua senha" required />
+
+          <button type="submit">Entrar</button>
+        </form>
+
+        <p id="mensagem-login" class="mensagem" aria-live="polite"></p>
+      </section>
+
+      <section id="tela-sistema" hidden>
+        <header class="topo">
+          <div>
+            <strong>SENAI</strong>
+            <span>Reserva de Salas</span>
+          </div>
+          <div class="usuario-logado">
+            <span id="nome-usuario"></span>
+            <button id="botao-sair" class="botao-secundario">Sair</button>
+          </div>
+        </header>
+
+        <p id="mensagem-sistema" class="mensagem" aria-live="polite"></p>
+
+        <section class="card">
+          <h1>Nova reserva</h1>
+          <p>Primeiro selecione a data e o turno. Depois escolha uma sala disponível.</p>
+
+          <div class="campos-reserva">
+            <div>
+              <label for="data-reserva">Data</label>
+              <input id="data-reserva" type="date" required />
+            </div>
+
+            <div>
+              <label for="turno-reserva">Turno</label>
+              <select id="turno-reserva">
+                <option value="manha">Manhã</option>
+                <option value="tarde">Tarde</option>
+                <option value="noite">Noite</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="motivo-reserva">Motivo</label>
+              <select id="motivo-reserva">
+                <option value="Aula teórica">Aula teórica</option>
+                <option value="Aula prática">Aula prática</option>
+                <option value="Reunião">Reunião</option>
+                <option value="Treinamento">Treinamento</option>
+                <option value="Atividade de curso">Atividade de curso</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="acoes">
+            <button id="botao-buscar-salas" type="button">Ver salas disponíveis</button>
+          </div>
+
+          <div id="salas-disponiveis" class="salas" aria-live="polite"></div>
+
+          <button id="botao-reservar" type="button" disabled>
+            Confirmar reserva
+          </button>
+        </section>
+
+        <section class="card">
+          <div class="titulo-com-acao">
+            <div>
+              <h2>Minhas reservas</h2>
+              <p>Consulte ou cancele as suas reservas.</p>
+            </div>
+            <button id="botao-atualizar-reservas" class="botao-secundario" type="button">
+              Atualizar
+            </button>
+          </div>
+
+          <div id="minhas-reservas" class="lista-reservas"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

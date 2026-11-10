@@ -1,0 +1,224 @@
+:root {
+  --azul: #063b68;
+  --azul-claro: #e8f1f8;
+  --cinza: #5b6670;
+  --borda: #c9d6e0;
+  --erro: #b42318;
+  --sucesso: #137333;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #f2f6f9;
+  color: #17212b;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.container {
+  width: min(1100px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 32px 0;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 8%);
+  margin-bottom: 24px;
+  padding: 28px;
+}
+
+.login-card {
+  width: min(480px, 100%);
+  margin: 56px auto;
+}
+
+.marca {
+  align-items: baseline;
+  color: var(--azul);
+  display: flex;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.marca strong,
+.topo strong {
+  font-size: 2rem;
+}
+
+h1, h2, p {
+  margin-top: 0;
+}
+
+p {
+  color: var(--cinza);
+  line-height: 1.5;
+}
+
+form, .campos-reserva {
+  display: grid;
+  gap: 12px;
+}
+
+.campos-reserva {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 20px 0;
+}
+
+.campos-reserva div {
+  display: grid;
+  gap: 8px;
+}
+
+label {
+  color: var(--azul);
+  font-weight: 700;
+}
+
+input, select, button {
+  border-radius: 8px;
+  font: inherit;
+}
+
+input, select {
+  border: 1px solid var(--borda);
+  min-height: 44px;
+  padding: 10px 12px;
+}
+
+button {
+  background: var(--azul);
+  border: 1px solid var(--azul);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 44px;
+  padding: 10px 16px;
+}
+
+button:hover {
+  filter: brightness(1.12);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+
+.botao-secundario {
+  background: #fff;
+  color: var(--azul);
+}
+
+.topo, .usuario-logado, .titulo-com-acao {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.topo {
+  background: var(--azul);
+  border-radius: 12px;
+  color: #fff;
+  margin-bottom: 24px;
+  padding: 16px 24px;
+}
+
+.topo > div:first-child {
+  align-items: baseline;
+  display: flex;
+  gap: 12px;
+}
+
+.usuario-logado {
+  gap: 14px;
+}
+
+.acoes {
+  margin-bottom: 20px;
+}
+
+.salas {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+  margin: 16px 0 24px;
+}
+
+.sala {
+  background: #fff;
+  color: var(--azul);
+  text-align: left;
+}
+
+.sala.selecionada {
+  background: var(--azul-claro);
+  border: 3px solid var(--azul);
+}
+
+.sala span {
+  display: block;
+  font-size: .85rem;
+  font-weight: 400;
+  margin-top: 4px;
+}
+
+.mensagem {
+  font-weight: 700;
+  min-height: 24px;
+}
+
+.mensagem.erro {
+  color: var(--erro);
+}
+
+.mensagem.sucesso {
+  color: var(--sucesso);
+}
+
+.lista-reservas {
+  display: grid;
+  gap: 12px;
+}
+
+.reserva {
+  align-items: center;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 16px;
+}
+
+.reserva p {
+  margin: 4px 0 0;
+}
+
+.status {
+  color: var(--sucesso);
+  font-size: .9rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.status.cancelada {
+  color: var(--erro);
+}
+
+@media (max-width: 700px) {
+  .campos-reserva {
+    grid-template-columns: 1fr;
+  }
+
+  .topo, .titulo-com-acao, .reserva {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

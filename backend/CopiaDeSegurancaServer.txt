@@ -1,0 +1,415 @@
+const express = require("express");
+const db = require("./database");
+
+const app = express();
+app.use(express.json());
+const PORT = 6767;
+const salas = [
+  { id: 1, nome: "Automação", tipo: "laboratório" },
+  { id: 2, nome: "Pneumática", tipo: "laboratório" },
+  { id: 3, nome: "Robótica", tipo: "laboratório" },
+  { id: 4, nome: "Sala 1", tipo: "sala comum" },
+  { id: 5, nome: "Laboratório de Informática 1", tipo: "laboratório" }
+];
+const professores = [
+  {
+    id: 1,
+    nome: "Sami Berti",
+    curso: "Operador de Processos Logísticos",
+    papel: "professor"
+  },
+  {
+    id: 2,
+    nome: "Aletodescatt",
+    curso: "Técnico em Eletromecânica",
+    papel: "professor"
+  },
+  {
+    id: 3,
+    nome: "Josué Cauon",
+    curso: "Eletricista Industrial",
+    papel: "professor"
+  },
+  {
+    id: 4,
+    nome: "Odairon",
+    curso: "Desenho Mecânico",
+    papel: "professor"
+  },
+  {
+    id: 5,
+    nome: "Eduarda",
+    curso: "Desenho Mecânico",
+    papel: "professor"
+  },
+  {
+    id: 6,
+    nome: "Poliana",
+    curso: "Mecânico de Manutenção de Máquinas Industriais",
+    papel: "professor"
+  },
+  {
+    id: 7,
+    nome: "Jeanifer",
+    curso: "Mecânico de Manutenção de Máquinas Industriais",
+    papel: "professor"
+  },
+  {
+    id: 8,
+    nome: "Jhonas",
+    curso: "Manutenção / Torno CNC",
+    papel: "professor"
+  },
+  {
+    id: 9,
+    nome: "Wallsion",
+    curso: "Manutenção / Torno CNC",
+    papel: "professor"
+  },
+  {
+    id: 10,
+    nome: "Dionatan",
+    curso: "Eletrônica",
+    papel: "professor"
+  },
+  {
+    id: 11,
+    nome: "Henry",
+    curso: "Robótica",
+    papel: "professor"
+  },
+  {
+    id: 12,
+    nome: "Mateufields",
+    curso: "Solda",
+    papel: "professor"
+  },
+  {
+    id: 13,
+    nome: "Ferranti",
+    curso: "Técnico em Automação",
+    papel: "professor"
+  }
+];
+const reservas = [];
+
+const historico = [];
+
+function adicionarAoHistorico(acao, reserva, autorId) {
+  historico.push({
+    id: historico.length + 1,
+    acao,
+    reservaId: reserva.id,
+    autorId,
+    dataHora: new Date().toISOString()
+  });
+}
+
+function existeConflito(salaId, professorId, data, turno, plano) {
+  const conflitoEmReservaExistente = reservas.some((reserva) => {
+    return (
+      reserva.data === data &&
+      reserva.turno === turno &&
+      (reserva.salaId === salaId || reserva.professorId === professorId) &&
+      reserva.status === "confirmada"
+    );
+  });
+
+  const conflitoNoPlano = plano.some((item) => {
+    return (
+      item.data === data &&
+      item.turno === turno &&
+      (item.salaId === salaId || item.professorId === professorId)
+    );
+  });
+
+  return conflitoEmReservaExistente || conflitoNoPlano;
+}
+
+function montarPlanoComBacktracking(pedidos, data, turno, indice, plano) {
+  if (indice === pedidos.length) {
+    return true;
+  }
+
+  const pedidoAtual = pedidos[indice];
+
+  for (const salaId of pedidoAtual.salasPermitidas) {
+    const salaExiste = salas.some((sala) => sala.id === salaId);
+
+    if (!salaExiste) {
+      continue;
+    }
+
+    const temConflito = existeConflito(
+      salaId,
+      pedidoAtual.professorId,
+      data,
+      turno,
+      plano
+    );
+
+    if (temConflito) {
+      continue;
+    }
+
+    const sugestao = {
+      professorId: pedidoAtual.professorId,
+      salaId,
+      data,
+      turno,
+      motivo: pedidoAtual.motivo,
+      status: "sugestao"
+    };
+
+    plano.push(sugestao);
+
+    const encontrouSolucao = montarPlanoComBacktracking(
+      pedidos,
+      data,
+      turno,
+      indice + 1,
+      plano
+    );
+
+    if (encontrouSolucao) {
+      return true;
+    }
+
+    plano.pop();
+  }
+
+  return false;
+}
+
+app.get("/", (req, res) => {
+  res.json({
+    mensagem: "Backend do sistema de reservas funcionando!"
+  });
+});
+app.get("/salas", (req, res) => {
+  const salasDoBanco = db
+    .prepare("SELECT id, nome, tipo FROM salas ORDER BY id")
+    .all();
+
+  res.json(salasDoBanco);
+});
+app.get("/reservas", (req, res) => {
+  res.json(reservas);
+});
+app.post("/reservas", (req, res) => {
+  const { salaId, professorId, data, turno, motivo } = req.body;
+
+  if (!salaId || !professorId || !data || !turno || !motivo) {
+    return res.status(400).json({
+      erro: "Sala, professor, data, turno e motivo são obrigatórios."
+    });
+  }
+
+  const turnosValidos = ["manha", "tarde", "noite"];
+
+  if (!turnosValidos.includes(turno)) {
+    return res.status(400).json({
+      erro: "O turno deve ser manha, tarde ou noite."
+    });
+  }
+
+  const salaExiste = salas.some((sala) => sala.id === salaId);
+
+  if (!salaExiste) {
+    return res.status(404).json({
+      erro: "Sala não encontrada."
+    });
+  }
+  const professorExiste = professores.some(
+  (professor) => professor.id === professorId
+);
+
+if (!professorExiste) {
+  return res.status(404).json({
+    erro: "Professor não encontrado."
+  });
+}
+
+  const salaOcupada = reservas.some((reserva) => {
+    return (
+      reserva.salaId === salaId &&
+      reserva.data === data &&
+      reserva.turno === turno &&
+      reserva.status === "confirmada"
+    );
+  });
+
+  if (salaOcupada) {
+    return res.status(409).json({
+      erro: "Esta sala já está reservada nesta data e turno."
+    });
+  }
+
+  const professorOcupado = reservas.some((reserva) => {
+    return (
+      reserva.professorId === professorId &&
+      reserva.data === data &&
+      reserva.turno === turno &&
+      reserva.status === "confirmada"
+    );
+  });
+
+  if (professorOcupado) {
+    return res.status(409).json({
+      erro: "Este professor já possui uma reserva nesta data e turno."
+    });
+  }
+
+  const novaReserva = {
+    id: reservas.length + 1,
+    salaId,
+    professorId,
+    data,
+    turno,
+    motivo,
+    status: "confirmada"
+  };
+
+  reservas.push(novaReserva);
+
+  adicionarAoHistorico("reserva_criada", novaReserva, professorId);
+
+  return res.status(201).json(novaReserva);
+});
+app.get("/salas-disponiveis", (req, res) => {
+  const { data, turno } = req.query;
+
+  if (!data || !turno) {
+    return res.status(400).json({
+      erro: "Informe a data e o turno."
+    });
+  }
+
+  const turnosValidos = ["manha", "tarde", "noite"];
+
+  if (!turnosValidos.includes(turno)) {
+    return res.status(400).json({
+      erro: "O turno deve ser manha, tarde ou noite."
+    });
+  }
+
+  const salasDisponiveis = salas.filter((sala) => {
+    const salaEstaOcupada = reservas.some((reserva) => {
+      return (
+        reserva.salaId === sala.id &&
+        reserva.data === data &&
+        reserva.turno === turno &&
+        reserva.status === "confirmada"
+      );
+    });
+
+    return !salaEstaOcupada;
+  });
+
+  return res.json({
+    data,
+    turno,
+    total: salasDisponiveis.length,
+    salas: salasDisponiveis
+  });
+});
+app.post("/sugestoes-grade", (req, res) => {
+  const { data, turno, pedidos } = req.body;
+
+  if (!data || !turno || !Array.isArray(pedidos) || pedidos.length === 0) {
+    return res.status(400).json({
+      erro: "Informe data, turno e uma lista de pedidos."
+    });
+  }
+
+  const plano = [];
+
+  const encontrouSolucao = montarPlanoComBacktracking(
+    pedidos,
+    data,
+    turno,
+    0,
+    plano
+  );
+
+  if (!encontrouSolucao) {
+    return res.status(409).json({
+      erro: "Não foi possível montar uma grade sem conflitos."
+    });
+  }
+
+  return res.json({
+    mensagem: "Grade sugerida com backtracking.",
+    plano
+  });
+});
+app.get("/professores", (req, res) => {
+  const professoresDoBanco = db
+    .prepare(`
+      SELECT id, nome, curso, papel
+      FROM usuarios
+      WHERE papel = 'professor'
+      ORDER BY id
+    `)
+    .all();
+
+  res.json(professoresDoBanco);
+});
+app.get("/professores/:professorId/reservas", (req, res) => {
+  const professorId = Number(req.params.professorId);
+
+  const professorExiste = professores.some(
+    (professor) => professor.id === professorId
+  );
+
+  if (!professorExiste) {
+    return res.status(404).json({
+      erro: "Professor não encontrado."
+    });
+  }
+
+  const reservasDoProfessor = reservas.filter((reserva) => {
+    return reserva.professorId === professorId;
+  });
+
+  return res.json(reservasDoProfessor);
+});
+app.patch("/reservas/:id/cancelar", (req, res) => {
+  const reservaId = Number(req.params.id);
+  const { professorId } = req.body;
+
+  const reserva = reservas.find((item) => item.id === reservaId);
+
+  if (!reserva) {
+    return res.status(404).json({
+      erro: "Reserva não encontrada."
+    });
+  }
+
+  if (reserva.professorId !== professorId) {
+    return res.status(403).json({
+      erro: "Você só pode cancelar a própria reserva."
+    });
+  }
+
+  if (reserva.status === "cancelada") {
+    return res.status(409).json({
+      erro: "Esta reserva já foi cancelada."
+    });
+  }
+
+  reserva.status = "cancelada";
+
+  adicionarAoHistorico("reserva_cancelada", reserva, professorId);
+
+  return res.json({
+    mensagem: "Reserva cancelada com sucesso.",
+    reserva
+  });
+});
+app.get("/historico", (req, res) => {
+  res.json(historico);
+});
+app.listen(PORT, () => {
+  console.log(`Servidor iniciado em http://localhost:${PORT}`);
+});
