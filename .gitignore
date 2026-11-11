@@ -1,0 +1,16 @@
+
+# Dependências
+node_modules/
+
+# Variáveis de ambiente e segredos
+.env
+.env.*
+!.env.example
+
+# Banco de dados local
+*.db
+*.db-shm
+*.db-wal
+
+# Arquivos do sistema
+.DS_Store
