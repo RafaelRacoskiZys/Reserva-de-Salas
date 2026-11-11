@@ -2,11 +2,11 @@ require("dotenv").config();
 
 const path = require("path");
 const express = require("express");
-const helmet = require("helmet");
-const rateLimit = require("express-rate-limit");
+const helmet = require("./node_modules/helmet/index.d.cts");
+const rateLimit = require("./node_modules/express-rate-limit/dist/index.d.cts");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const db = require("./database");
+const db = require("./backend/database");
 
 const app = express();
 
