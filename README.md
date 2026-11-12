@@ -10,12 +10,12 @@ Projeto Integrador II. Sistema web para professores reservarem salas por data e 
 
 ## Como rodar
 
-Dentro da pasta `backend`:
+Dentro da pasta `backend`(pra entrar nela é só abrir o terminal e dar cd backend):
 
 1. Instale as dependências: `npm install`
 2. Crie um arquivo `.env` com uma chave secreta qualquer: `JWT_SECRET=troque-por-uma-frase-longa`
-3. Crie as contas de teste: `node CriarCredenciaisDeTeste.js`
-4. Inicie o servidor: `node server.js`
+3. Crie as contas de teste: `node CriarCredenciaisDeTeste.js` no terminal
+4. Inicie o servidor: `node server.js` no terminal
 5. Abra `http://localhost:6767` no navegador
 
 O banco (`reservas.db`) e o `.env` ficam sempre na pasta `backend`, não importa de onde o comando seja executado.
