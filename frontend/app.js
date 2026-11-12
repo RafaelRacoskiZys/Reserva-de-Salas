@@ -515,7 +515,7 @@ async function reservasCoordenacao() {
             <td>${TURNOS[r.turno]?.nome}</td>
             <td>${esc(r.motivo)}</td>
             <td>${pill(STATUS[r.status] ?? [r.status, ""])}</td>
-            <td>${r.status === "confirmada" ? `
+            <td>${r.status === "confirmada" && r.data >= hoje() ? `
               <a class="btn pequeno claro" href="#/reservas/${r.id}/alterar">Alterar</a>
               <a class="btn pequeno perigo" href="#/reservas/${r.id}/cancelar">Cancelar</a>` : ""}</td>
           </tr>`).join("")}</tbody>
@@ -711,7 +711,7 @@ async function telaTrocas() {
    Gerar grade (coordenação) — o backtracking do servidor distribui as salas
    ========================================================= */
 const grade = {
-  data: "", turno: "manha", motivo: "", selecionados: [], usarHeuristica: false,
+  data: "", turno: "manha", motivo: "", selecionados: [], priorizarMenosOpcoes: false,
   resultado: null, estatisticas: null, erro: "", dados: null,
 };
 
@@ -721,7 +721,7 @@ const reservasDoPeriodo = () =>
 async function telaGrade() {
   const [lista, professores, reservas] = await Promise.all([salas(), api("/professores"), api("/reservas")]);
   Object.assign(grade, {
-    data: hoje(), turno: "manha", motivo: "", selecionados: [], usarHeuristica: false,
+    data: hoje(), turno: "manha", motivo: "", selecionados: [], priorizarMenosOpcoes: false,
     resultado: null, estatisticas: null, erro: "", dados: { lista, professores, reservas },
   });
   const ocupados = new Set(reservasDoPeriodo().map((r) => r.professorId));
@@ -731,7 +731,7 @@ async function telaGrade() {
 
 const corpoDaGrade = () => ({
   data: grade.data, turno: grade.turno, motivo: grade.motivo,
-  professores: grade.selecionados, heuristica: grade.usarHeuristica,
+  professores: grade.selecionados, priorizarMenosOpcoes: grade.priorizarMenosOpcoes,
 });
 
 function desenharGrade() {
@@ -777,8 +777,8 @@ function desenharGrade() {
     </div>
 
     <label style="display:flex;gap:.5rem;align-items:center;margin-top:1rem">
-      <input type="checkbox" id="g-heuristica" ${grade.usarHeuristica ? "checked" : ""}>
-      Usar heurística (atender primeiro quem tem menos salas possíveis)
+      <input type="checkbox" id="g-prioridade" ${grade.priorizarMenosOpcoes ? "checked" : ""}>
+      Priorizar quem tem menos opções de sala (atendê-los primeiro)
     </label>
 
     <div class="botoes"><button class="btn" id="g-gerar" disabled>Gerar grade</button></div>
@@ -806,7 +806,7 @@ function desenharGrade() {
   $("#g-data").onchange = (e) => { grade.data = e.target.value; limparResultado(); desenharGrade(); };
   $$("input[name=g-turno]").forEach((i) => (i.onchange = () => { grade.turno = i.value; limparResultado(); desenharGrade(); }));
   $("#g-motivo").onchange = (e) => { grade.motivo = e.target.value; limparResultado(); validar(); };
-  $("#g-heuristica").onchange = (e) => { grade.usarHeuristica = e.target.checked; limparResultado(); };
+  $("#g-prioridade").onchange = (e) => { grade.priorizarMenosOpcoes = e.target.checked; limparResultado(); };
   $("#g-todos").onclick = () => { grade.selecionados = disponiveis.map((p) => p.id); limparResultado(); desenharGrade(); };
   $("#g-nenhum").onclick = () => { grade.selecionados = []; limparResultado(); desenharGrade(); };
   $$("#g-profs input").forEach((i) => (i.onchange = () => {

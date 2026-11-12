@@ -1,16 +1,20 @@
-require("dotenv").config();
-
 const path = require("path");
+
+// Lê o .env da pasta backend, não importa de onde o comando for rodado.
+require("dotenv").config({ path: path.join(__dirname, ".env") });
+
 const express = require("express");
 const helmet = require("helmet");
-const rateLimit = require("express-rate-limit");
+const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const db = require("./database");
 
 const app = express();
 
-
+// Cabeçalhos de segurança. O HSTS e o "upgrade-insecure-requests" ficam
+// desligados porque o projeto roda em http://localhost (sem HTTPS); o Safari,
+// por exemplo, quebraria a página com esse upgrade automático.
 app.use(
   helmet({
     hsts: false,
@@ -31,19 +35,37 @@ if (!JWT_SECRET) {
   throw new Error("JWT_SECRET não foi encontrada no arquivo .env");
 }
 
+// Limites de tentativas de login (só as tentativas ERRADAS contam):
+// 1) por endereço + CPF: protege cada conta contra quem tenta adivinhar a senha,
+//    sem bloquear os outros professores que usam a mesma rede da escola;
+// 2) por endereço: freio geral contra quem testa vários CPFs.
+const LIMITE_DE_LOGIN = Number(process.env.LOGIN_LIMITE) || 10;
 
-const limitarLogin = rateLimit({
+const opcoesDoLimiteDeLogin = {
   windowMs: 15 * 60 * 1000,
-  limit: Number(process.env.LOGIN_LIMITE) || 10,
   skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
     erro: "Muitas tentativas de login. Tente novamente em 15 minutos."
   }
+};
+
+const limitarLoginPorCpf = rateLimit({
+  ...opcoesDoLimiteDeLogin,
+  limit: LIMITE_DE_LOGIN,
+  keyGenerator: (req) =>
+    `${ipKeyGenerator(req.ip)}|${normalizarCpf(req.body?.cpf ?? "")}`
+});
+
+const limitarLoginPorEndereco = rateLimit({
+  ...opcoesDoLimiteDeLogin,
+  limit: LIMITE_DE_LOGIN * 10,
+  keyGenerator: (req) => ipKeyGenerator(req.ip)
 });
 
 const turnosValidos = ["manha", "tarde", "noite"];
+const MOTIVO_MAXIMO = 300;
 
 function dataEhValida(data) {
   if (typeof data !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(data)) {
@@ -67,7 +89,7 @@ function dataDeHoje() {
   return `${agora.getFullYear()}-${dois(agora.getMonth() + 1)}-${dois(agora.getDate())}`;
 }
 
-
+// Datas no formato AAAA-MM-DD podem ser comparadas como texto.
 function dataEhPassada(data) {
   return data < dataDeHoje();
 }
@@ -174,7 +196,8 @@ function buscarTroca(trocaId) {
   `).get(trocaId);
 }
 
-
+// Quando uma reserva é cancelada ou muda de sala, data ou turno, os pedidos de
+// troca que ainda estavam pendentes para ela deixam de fazer sentido.
 function encerrarTrocasPendentes(reservaId) {
   db.prepare(`
     UPDATE solicitacoes_troca
@@ -207,10 +230,13 @@ function existeConflito(salaId, professorId, data, turno, plano) {
   return Boolean(conflitoNoBanco) || conflitoNoPlano;
 }
 
-
+// Limite de segurança: o backtracking é exponencial no pior caso, então a busca
+// é interrompida se passar desse número de verificações.
 const LIMITE_DE_VERIFICACOES = 20000;
 
-
+// Backtracking clássico: escolhe uma sala para o pedido atual, avança para o
+// próximo pedido e, se não houver solução, desfaz a escolha (pop) e tenta outra.
+// "estatisticas" só conta quantas tentativas e quantos retrocessos aconteceram.
 function montarPlanoComBacktracking(
   pedidos,
   data,
@@ -282,9 +308,11 @@ function montarPlanoComBacktracking(
   return false;
 }
 
-
-function ordenarPedidos(pedidos, usarHeuristica) {
-  if (!usarHeuristica) {
+// Prioridade OPCIONAL: atender primeiro os pedidos que têm menos salas
+// possíveis. Fica desligada por padrão para o backtracking clássico aparecer
+// em ação; ligue com "priorizarMenosOpcoes": true para comparar.
+function ordenarPedidos(pedidos, priorizarMenosOpcoes) {
+  if (!priorizarMenosOpcoes) {
     return pedidos;
   }
 
@@ -293,12 +321,12 @@ function ordenarPedidos(pedidos, usarHeuristica) {
   );
 }
 
-function gerarGrade({ data, turno, pedidos, usarHeuristica }) {
+function gerarGrade({ data, turno, pedidos, priorizarMenosOpcoes }) {
   const plano = [];
   const estatisticas = { tentativas: 0, retrocessos: 0, verificacoes: 0 };
 
   const encontrouSolucao = montarPlanoComBacktracking(
-    ordenarPedidos(pedidos, usarHeuristica),
+    ordenarPedidos(pedidos, priorizarMenosOpcoes),
     data,
     turno,
     0,
@@ -313,7 +341,8 @@ function gerarGrade({ data, turno, pedidos, usarHeuristica }) {
   return encontrouSolucao ? { plano, estatisticas } : null;
 }
 
-
+// Salas em que o professor pode dar aula, em ordem de preferência (tabela
+// professor_salas). Em aula teórica, as salas comuns passam na frente.
 function salasDoProfessor(professorId, motivo) {
   const salas = db.prepare(`
     SELECT s.id, s.tipo
@@ -333,6 +362,11 @@ function salasDoProfessor(professorId, motivo) {
   return salas.map((sala) => sala.id);
 }
 
+// Valida e normaliza o corpo das rotas de grade (sugerir e confirmar).
+// Dois jeitos de pedir:
+//  - automático: { data, turno, motivo, professores: [ids] }
+//    (as salas de cada professor vêm do banco);
+//  - manual: { data, turno, pedidos: [{ professorId, salasPermitidas, motivo }] }.
 function lerPedidosDaGrade(corpo) {
   const { data, turno } = corpo;
 
@@ -376,6 +410,10 @@ function lerPedidosDaGrade(corpo) {
       return { erro: "Informe o motivo da grade." };
     }
 
+    if (pedido.motivo.length > MOTIVO_MAXIMO) {
+      return { erro: `O motivo deve ter no máximo ${MOTIVO_MAXIMO} caracteres.` };
+    }
+
     if (pedido.salasPermitidas.length === 0) {
       return { erro: "Há professores sem salas cadastradas." };
     }
@@ -391,10 +429,13 @@ function lerPedidosDaGrade(corpo) {
     data,
     turno,
     pedidos,
-    usarHeuristica: corpo.heuristica === true
+    priorizarMenosOpcoes: corpo.priorizarMenosOpcoes === true
   };
 }
 
+// Poda inicial: antes de rodar o backtracking, procura impossibilidades
+// óbvias (professor que já tem reserva ou professor sem nenhuma sala livre).
+// Devolve a mensagem do problema, ou null se não achou nada.
 function encontrarBloqueioDaGrade({ data, turno, pedidos }) {
   const nomeDoProfessor = (id) => buscarProfessor(id)?.nome ?? `Professor ${id}`;
 
@@ -431,7 +472,7 @@ function encontrarBloqueioDaGrade({ data, turno, pedidos }) {
   return null;
 }
 
-
+// Roda a poda inicial e depois o backtracking. Devolve { erro } ou { plano, estatisticas }.
 function montarGradeCompleta(dados) {
   const bloqueio = encontrarBloqueioDaGrade(dados);
 
@@ -456,7 +497,7 @@ function montarGradeCompleta(dados) {
   return resultado;
 }
 
-app.post("/login", limitarLogin, async (req, res) => {
+app.post("/login", limitarLoginPorEndereco, limitarLoginPorCpf, async (req, res) => {
   const cpf = normalizarCpf(req.body.cpf);
   const senha = req.body.senha;
 
@@ -649,6 +690,12 @@ app.post("/reservas", autenticarToken, (req, res) => {
   if (!salaId || !professorId || !data || !turno || !motivo) {
     return res.status(400).json({
       erro: "Sala, professor, data, turno e motivo são obrigatórios."
+    });
+  }
+
+  if (motivo.length > MOTIVO_MAXIMO) {
+    return res.status(400).json({
+      erro: `O motivo deve ter no máximo ${MOTIVO_MAXIMO} caracteres.`
     });
   }
 
@@ -850,7 +897,7 @@ app.patch("/reservas/:id", autenticarToken, (req, res) => {
     });
   }
 
-  if (!buscarSala(salaId) || !dataEhValida(data) || !turnosValidos.includes(turno) || !motivo) {
+  if (!buscarSala(salaId) || !dataEhValida(data) || !turnosValidos.includes(turno) || !motivo || motivo.length > MOTIVO_MAXIMO) {
     return res.status(400).json({
       erro: "Sala, data, turno ou motivo inválido."
     });
@@ -1013,7 +1060,8 @@ app.post(
   }
 );
 
-
+// Confirma a grade: o servidor monta o plano de novo (não confia no que o
+// navegador mostrou) e cria todas as reservas numa única transação.
 app.post(
   "/sugestoes-grade/confirmar",
   autenticarToken,
@@ -1138,9 +1186,9 @@ app.post("/trocas", autenticarToken, (req, res) => {
     });
   }
 
-  if (motivo.length > 300) {
+  if (motivo.length > MOTIVO_MAXIMO) {
     return res.status(400).json({
-      erro: "O motivo deve ter no máximo 300 caracteres."
+      erro: `O motivo deve ter no máximo ${MOTIVO_MAXIMO} caracteres.`
     });
   }
 
@@ -1330,7 +1378,7 @@ app.patch("/trocas/:id/responder", autenticarToken, (req, res) => {
     });
   }
 
-
+  // Antes de trocar, confere se as reservas ainda são as mesmas do pedido.
   const aindaPossivel =
     reservaSolicitante.status === "confirmada" &&
     reservaDestino.status === "confirmada" &&
@@ -1378,7 +1426,8 @@ app.patch("/trocas/:id/responder", autenticarToken, (req, res) => {
       WHERE id = ?
     `).run(trocaId);
 
-
+    // As salas mudaram, então outros pedidos pendentes dessas reservas
+    // deixam de valer.
     encerrarTrocasPendentes(reservaSolicitante.id);
     encerrarTrocasPendentes(reservaDestino.id);
   });
@@ -1427,6 +1476,33 @@ app.get("/reservas-resumo", autenticarToken, (req, res) => {
   res.json(reservas);
 });
 
+// Rotas que não existem respondem em JSON.
+app.use((req, res) => {
+  res.status(404).json({ erro: "Rota não encontrada." });
+});
+
+// Qualquer erro inesperado vira uma resposta simples em JSON: os detalhes
+// (com caminhos de arquivos) ficam só no terminal, nunca vão para o navegador.
+app.use((erro, req, res, next) => {
+  if (res.headersSent) {
+    return next(erro);
+  }
+
+  if (erro.type === "entity.parse.failed") {
+    return res.status(400).json({ erro: "O JSON enviado é inválido." });
+  }
+
+  if (erro.type === "entity.too.large") {
+    return res.status(413).json({ erro: "O conteúdo enviado é grande demais." });
+  }
+
+  console.error(erro);
+
+  return res.status(500).json({ erro: "Erro interno do servidor." });
+});
+
+// Só inicia o servidor quando o arquivo é executado diretamente
+// (node server.js). Nos testes, o arquivo é apenas importado.
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Servidor iniciado em http://localhost:${PORT}`);

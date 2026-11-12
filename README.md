@@ -1,94 +1,72 @@
-# Sistema de Reserva de Salas
+# Sistema de Reservas de Salas — SENAI José Oscar Salazar
 
-Sistema desenvolvido para facilitar o gerenciamento e a organização de reservas de salas, permitindo que professores consultem a disponibilidade dos ambientes e realizem solicitações de reserva.
+Projeto Integrador II. Sistema web para professores reservarem salas por data e turno, sem conflitos, com troca de sala entre professores e uma área de coordenação que gera a grade de salas automaticamente com o algoritmo clássico de backtracking.
 
-## Como executar o projeto
+## Tecnologias
 
-Para utilizar o sistema, é necessário baixar o projeto e executá-lo localmente no computador.
+- Backend: Node.js, Express, SQLite (better-sqlite3)
+- Segurança: bcrypt (senhas), JWT (sessão), helmet (cabeçalhos), express-rate-limit (limite de tentativas de login)
+- Frontend: HTML, CSS e JavaScript puros (sem framework)
 
-### 1. Baixar o projeto
+## Como rodar
 
-1. Acesse este repositório no GitHub.
-2. Clique no botão **Code**.
-3. Selecione **Download ZIP**.
-4. Extraia o arquivo ZIP em uma pasta do computador.
+Dentro da pasta `backend`:
 
-### 2. Instalar o Node.js
+1. Instale as dependências: `npm install`
+2. Crie um arquivo `.env` com uma chave secreta qualquer: `JWT_SECRET=troque-por-uma-frase-longa`
+3. Crie as contas de teste: `node CriarCredenciaisDeTeste.js`
+4. Inicie o servidor: `node server.js`
+5. Abra `http://localhost:6767` no navegador
 
-O projeto utiliza Node.js para executar o servidor.
+O banco (`reservas.db`) e o `.env` ficam sempre na pasta `backend`, não importa de onde o comando seja executado.
 
-Caso ainda não tenha instalado, acesse o site oficial e faça o download:
+## Contas de teste
 
-https://nodejs.org/
+A senha de todas é `Senha@123`. Os CPFs são fictícios.
 
-Recomenda-se instalar a versão LTS.
+- Professores: `90000000001` (Sami Berti), `90000000002` (Aletodescatt), e assim por diante até `90000000013`
+- Coordenadoras: `90000000101`, `90000000102` e `90000000103`
 
-### 3. Instalar as dependências
+## Geração automática de grade (backtracking)
 
-1. Abra a pasta do projeto extraída.
-2. Entre na pasta `backend`.
-3. Abra um terminal nessa pasta.
-4. Execute o seguinte comando:
+A coordenadora escolhe a data, o turno, o motivo e os professores. Nenhuma sala é digitada: o algoritmo decide.
 
-```bash
-npm install
-```
+- Cada professor tem, no banco (tabela `professor_salas`), uma lista de salas em ordem de preferência: primeiro as salas do curso dele (por exemplo, Solda 1 e Solda 2 para o professor de Solda) e depois as salas comuns. Em aula teórica, as salas comuns vêm primeiro.
+- O backtracking percorre os professores um a um, escolhe a primeira sala livre da lista, avança para o próximo e, se um professor ficar sem sala, desfaz a escolha anterior (`pop`) e tenta a próxima sala.
+- Antes da busca há uma poda inicial: professor que já tem reserva no período, ou professor sem nenhuma sala livre, é avisado na hora.
+- Como o backtracking pode crescer muito, a busca tem um limite de segurança de verificações.
+- A tela mostra quantas escolhas o algoritmo testou e quantas vezes voltou atrás.
+- Existe uma opção, desligada por padrão, de priorizar quem tem menos opções de sala (atendê-los primeiro). Ela pode reduzir ou aumentar o número de retrocessos, dependendo do caso.
+- A grade gerada é só uma sugestão até a coordenadora clicar em "Confirmar grade", que cria todas as reservas de uma vez.
 
-Esse comando instalará as dependências necessárias para executar o sistema.
+## Estrutura
 
-### 4. Iniciar o sistema
+- `backend/server.js`: rotas da API e regras do sistema
+- `backend/database.js`: criação do banco, tabelas e dados iniciais
+- `frontend/`: telas do sistema (`index.html`, `style.css`, `app.js`)
 
-Após a instalação das dependências, execute:
+## Regras principais
 
-```bash
-npm start
-```
+- Uma sala não pode ter duas reservas confirmadas no mesmo dia e turno, e um professor também não.
+- Não é possível reservar datas que já passaram.
+- O motivo de reservas e trocas tem no máximo 300 caracteres.
+- Trocas de sala só acontecem entre reservas do mesmo dia e turno e precisam ser aceitas pelo outro professor ou pela coordenação. Se uma das reservas for cancelada ou alterada, os pedidos pendentes são encerrados.
+- Toda ação importante fica registrada no histórico.
+- A coordenação pode alterar e cancelar qualquer reserva e gerar grades com backtracking.
 
-O servidor será iniciado localmente na porta `6767`.
+## Segurança
 
-### 5. Acessar o sistema
+- Senhas guardadas apenas como hash (bcrypt) e login com mensagem igual para CPF ou senha errados.
+- Sessão por token JWT com validade de 2 horas; rotas protegidas por token e por papel.
+- Consultas SQL sempre com parâmetros (protege contra SQL injection) e textos escapados na tela (protege contra XSS).
+- Login limitado a 10 tentativas erradas a cada 15 minutos por CPF (e um limite geral maior por endereço), para um professor não bloquear os outros que usam a mesma rede.
+- Cabeçalhos de segurança com helmet.
+- Erros inesperados respondem uma mensagem simples; os detalhes ficam só no terminal.
 
-Com o servidor em execução, abra seu navegador e acesse:
+## Limitações conhecidas
 
-**http://localhost:6767**
-
-Pronto! O sistema estará disponível para utilização.
-
----
-
-## Banco de dados
-
-O projeto utiliza SQLite para armazenar as informações das reservas.
-
-O banco de dados é armazenado localmente no computador onde o sistema está sendo executado.
-
-Isso significa que:
-
-- Não é necessária uma hospedagem externa.
-- As reservas ficam salvas no próprio computador.
-- Cada instalação possui seu próprio banco de dados.
-- Os dados permanecem disponíveis mesmo após fechar o sistema, desde que o arquivo do banco seja preservado.
-
-**Importante:** como o sistema funciona localmente, diferentes computadores não compartilham automaticamente as mesmas reservas. Para que vários usuários utilizem o mesmo banco de dados, seria necessário hospedar o backend em um servidor acessível por todos.
-
----
-
-## Tecnologias utilizadas
-
-- **HTML5** – Estrutura das páginas.
-- **CSS3** – Estilização e organização visual.
-- **JavaScript** – Funcionalidades e interatividade.
-- **Node.js** – Execução do servidor.
-- **Express** – Gerenciamento das rotas e requisições.
-- **SQLite** – Armazenamento dos dados.
-
----
-
-## Observações
-
-- O terminal precisa permanecer aberto enquanto o sistema estiver sendo utilizado.
-- Para encerrar o servidor, pressione `Ctrl + C` no terminal.
-- Para iniciar novamente, basta acessar a pasta `backend` e executar `npm start`.
-- Não compartilhe arquivos contendo senhas, tokens ou chaves secretas.
-
-**Desenvolvido como projeto acadêmico.**
+- O CPF fica guardado em texto no banco, o que exigiria cuidados extras de LGPD em produção.
+- Um sistema real precisaria de HTTPS e de senha provisória com troca obrigatória no primeiro acesso.
+- Os usuários são criados por script; ainda não há tela de cadastro para a coordenação.
+- A lista de salas de cada professor é cadastrada no código (`database.js`), sem tela para editar.
+- O histórico de uma reserva trocada mostra a sala atual dela, não a sala da época da ação.
