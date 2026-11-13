@@ -12,6 +12,8 @@ Projeto Integrador II. Sistema web para professores reservarem salas por data e 
 
 Dentro da pasta `backend`(pra entrar nela é só abrir o terminal e dar cd backend):
 
+(se for windows, antes dos passos a seguir de npm.cmd Install better-sqlite3@ˆ12)
+
 1. Instale as dependências: `npm install`
 2. Crie um arquivo `.env` com uma chave secreta qualquer: `JWT_SECRET=troque-por-uma-frase-longa`
 3. Crie as contas de teste: `node CriarCredenciaisDeTeste.js` no terminal
